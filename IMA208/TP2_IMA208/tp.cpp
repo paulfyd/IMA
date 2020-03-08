@@ -379,66 +379,59 @@ void reshape(int w, int h) {
 
 
 
-
-
-
-
-
-
-
-
-
-
 void HPSS( Vec3 inputPoint, // the point you need to project
            Vec3 & outputPoint , Vec3 & outputNormal , // the projection (and the normal at the projection)
            std::vector< Vec3 > const & inputPositions , std::vector< Vec3 > const & inputNormals , // the input pointset on which you want to project
            BasicANNkdTree const & inputPointsetKdTree , // the input pointset kdtree: it can help you find the points that are nearest to a query point
-           int kernel_type , float radius, // the parameters for the MLS surface (a kernel can be i) a Gaussian, ii) Wendland, iii) Singular
+           int kernel_type , float radius , // the parameters for the MLS surface (a kernel can be i) a Gaussian, ii) Wendland, iii) Singular
            unsigned int numberOfIterations , // the number of iterations of the MLS algorithm
            unsigned int knn = 20 ) { // the number of nearest neighbors you will consider when computing the MLS projection
     // TO CHANGE:
     outputPoint = inputPoint;
-    for( unsigned int k = 0 ; k < numberOfIterations ; k++ ){
 
+    for( unsigned int k = 0 ; k < numberOfIterations ; k++ ){
       // Génération des vecteurs avec les ppv et les distances respectives
       ANNidxArray id_nearest_neighbors = new ANNidx[knn];
       ANNdistArray square_distances_to_neighbors = new ANNdist[knn];
       inputPointsetKdTree.knearest(outputPoint, knn, id_nearest_neighbors, square_distances_to_neighbors);
-      //Initialisations
+      //Initialisations des variables utiles
       std::vector<Vec3> projections;
-      float * w = new float[knn]; //vecteur des poids (dépend du kernel choisi)
+      double * w = new double[knn]; //vecteur des poids (dépend du kernel choisi)
       Vec3 n = Vec3(0,0,0);
       Vec3 c = Vec3(0,0,0);
-      float c_denom = 0;
+      double c_denom = 0;
 
       for( unsigned int i = 0 ; i < knn ; i++ ){
         //MAJ de center, de la normale
         int index = id_nearest_neighbors[i];
         projections.push_back(outputPoint-(Vec3::dot(outputPoint-inputPositions[index],inputNormals[index]))*inputNormals[index]);
 
+        Vec3 p_i = positions[id_nearest_neighbors[i]];
+        double r2 = (outputPoint - p_i).squareLength();
+
+        //Calculs des poids wi selon le noyau
         if (kernel_type==0){
-          w[i] = 1.0/(sqrt(2*3.14)/radius)*exp(-square_distances_to_neighbors[i]/(2*(radius*radius)));
-          c = c + w[i]*projections[i];
-          n = n+ w[i]*inputNormals[index];
-          c_denom = c_denom + w[i];
+          w[i] = exp(-r2/(2*(pow(radius,2))));
         }
 
         if (kernel_type==1){
-          w[i] = (1+4*square_distances_to_neighbors[i]/radius)*pow((1-(square_distances_to_neighbors[i])/radius),4);
-          c = c + w[i]*projections[i];
-          n = n+ w[i]*inputNormals[index];
-          c_denom = c_denom + w[i];
+          w[i] = (1+r2/radius)*pow((1-(r2/radius)),4);
         }
 
+        if (kernel_type==2){
+          w[i] = pow( (radius)*(radius) / r2 , 3/2);
+        }
 
-
+        c += w[i]*projections[i];
+        n += w[i]*inputNormals[index];
+        c_denom += w[i];
 
       }
 
       delete[] id_nearest_neighbors;
       delete[] square_distances_to_neighbors;
 
-      //projection
+      //projection pour obtention d'un nouveau outputPoint
       c = c/c_denom;
       n.normalize();
       outputPoint = outputPoint - Vec3::dot(outputPoint-c,n)*n;
@@ -447,9 +440,97 @@ void HPSS( Vec3 inputPoint, // the point you need to project
     }
 }
 
+void APSS( Vec3 inputPoint, // the point you need to project
+           Vec3 & outputPoint , Vec3 & outputNormal , // the projection (and the normal at the projection)
+           std::vector< Vec3 > const & inputPositions , std::vector< Vec3 > const & inputNormals , // the input pointset on which you want to project
+           BasicANNkdTree const & inputPointsetKdTree , // the input pointset kdtree: it can help you find the points that are nearest to a query point
+           int kernel_type , float radius , // the parameters for the MLS surface (a kernel can be i) a Gaussian, ii) Wendland, iii) Singular
+           unsigned int numberOfIterations , // the number of iterations of the MLS algorithm
+           unsigned int knn = 20 ) { // the number of nearest neighbors you will consider when computing the MLS projection
+    // TO CHANGE:
+    outputPoint = inputPoint;
 
+    for( unsigned int k = 0 ; k < numberOfIterations ; k++ ){
 
+      // Génération des vecteurs avec les ppv et les distances respectives
+      ANNidxArray id_nearest_neighbors = new ANNidx[knn];
+      ANNdistArray square_distances_to_neighbors = new ANNdist[knn];
+      inputPointsetKdTree.knearest(outputPoint, knn, id_nearest_neighbors, square_distances_to_neighbors);
+      //Initialisations
+      std::vector<Vec3> projections;
+      float * w = new float[knn];
+      float u4 = 0;
+      Vec3 u123 =  Vec3(0,0,0);
+      float u0 = 0;
+      float t0= 0; //term0 useful to calculate u4
+      Vec3 t1 = Vec3(0,0,0); //term1 useful to calculate u4
+      Vec3 t2 = Vec3(0,0,0); //term2 useful to calculate u4
+      float t3= 0; //term3 useful to calculate u4
+      float t4 = 0; //term4 useful to calculate u123
+      float t5 = 0; //term5 useful to calculate u0
 
+      for( unsigned int i = 0 ; i < knn ; i++ ){
+        //Calculs des poids wi et des 4 termes permettant d'obtenir u4 (t0, t1, t2 et t3)
+        int index = id_nearest_neighbors[i];
+        projections.push_back(outputPoint-(Vec3::dot(outputPoint-inputPositions[index],inputNormals[index]))*inputNormals[index]);
+
+        if (kernel_type==0){
+          w[i] = exp(-square_distances_to_neighbors[i]/(2*(radius*radius)));
+        }
+
+        if (kernel_type==1){
+          w[i] = (1+4*square_distances_to_neighbors[i]/radius)*pow((1-(square_distances_to_neighbors[i])/radius),4);
+        }
+
+        if (kernel_type==2){
+          w[i] = pow( (radius)*(radius) / square_distances_to_neighbors[i] , 3/2);
+        }
+
+        t0 = t0 + w[i]*Vec3::dot(projections[i],inputNormals[index]);
+        t1 = t1 + w[i]*projections[i];
+        t2 = t2 + w[i]*inputNormals[index];
+        t3 = t3 + w[i]*Vec3::dot(projections[i],projections[i]);
+
+      }
+
+      t2.normalize();
+      u4 = 0.5*(t0-Vec3::dot(t1,t2))/(t3-Vec3::dot(t1,t2));
+
+      for( unsigned int i = 0 ; i < knn ; i++ ){
+        //Calculs des termes permettant d'obtenir u123 (plus qu'à normaliser après la boucle)
+        int index = id_nearest_neighbors[i];
+        projections.push_back(outputPoint-(Vec3::dot(outputPoint-inputPositions[index],inputNormals[index]))*inputNormals[index]);
+        u123 = u123 + w[i]*(inputNormals[index]-2*u4*projections[i]);
+      }
+
+      u123.normalize();
+
+      for( unsigned int i = 0 ; i < knn ; i++ ){
+        //Calculs des deux termes permettant d'obtenirs u0 (t4 et t5)
+        int index = id_nearest_neighbors[i];
+        projections.push_back(outputPoint-(Vec3::dot(outputPoint-inputPositions[index],inputNormals[index]))*inputNormals[index]);
+        t4 = t4 + w[i]*Vec3::dot(u123+u4*projections[i],projections[i]);
+        t5 = t5 + w[i];
+      }
+
+      u0 = -t4/t5;
+
+    // Projection sur le cercle
+    Vec3 c = -1*u123/ (2*u4);
+    float r2 = c.squareLength() - u0 / u4;
+
+    float lambda = 1 - sqrt(r2 / (outputPoint - c).squareLength());
+    outputPoint = (1 - lambda) * outputPoint + lambda * c;
+
+    // Normal vector
+    Vec3 n = u123 + 2 * u4 * outputPoint;
+    outputNormal = n / sqrt(n.squareLength());
+
+    delete[] id_nearest_neighbors;
+    delete[] square_distances_to_neighbors;
+
+    }
+}
 
 
 int main (int argc, char ** argv) {
@@ -473,19 +554,30 @@ int main (int argc, char ** argv) {
 
     {
         // Load a first pointset, and build a kd-tree:
-        loadPN("pointsets/igea.pn" , positions , normals);
+        loadPN("pointsets/dino.pn" , positions , normals);
+
+
+        //Ajout du bruit d'amplitude M si true
+        if ( false ) {
+           for( unsigned int i = 0 ; i < positions.size() ; ++i) {
+                float M = 0.02;
+                float m = -0.02;
+                float bruit = m + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(M-m)));
+                positions[ i ] += bruit * normals[ i ];
+           }
+       }
 
         BasicANNkdTree kdtree;
         kdtree.build(positions);
 
         // Create a second pointset that is artificial, and project it on pointset1 using MLS techniques:
-        positionsToProject.resize( 20000 );
+        positionsToProject.resize(100000);
         normalsToProject.resize(positionsToProject.size());
         for( unsigned int pIt = 0 ; pIt < positionsToProject.size() ; ++pIt ) {
             positionsToProject[pIt] = Vec3(
                         -0.6 + 1.2 * (double)(rand())/(double)(RAND_MAX),
-                        -0.6 + 1.2 * (double)(rand())/(double)(RAND_MAX),
-                        -0.6 + 1.2 * (double)(rand())/(double)(RAND_MAX)
+                        -0.6 + 1.2 *(double)(rand())/(double)(RAND_MAX),
+                        -0.6+ 1.2 *(double)(rand())/(double)(RAND_MAX)
                         );
             positionsToProject[pIt].normalize();
             positionsToProject[pIt] = 0.6 * positionsToProject[pIt];
@@ -494,7 +586,6 @@ int main (int argc, char ** argv) {
         // IF YOU WANT TO TAKE AS POINTSET TO PROJECT THE INPUT POINTSET ITSELF: USEFUL FOR POINTSET FILTERING
         if( false ) {
             positionsToProject = positions;
-            normalsToProject = normals;
         }
 
         // INITIALIZE THE PROJECTED POINTSET (USEFUL MAINLY FOR MEMORY ALLOCATION)
@@ -505,7 +596,7 @@ int main (int argc, char ** argv) {
         // PROJECT USING MLS (HPSS, and later APSS):
         for( unsigned int pIt = 0 ; pIt < positionsToProject.size() ; ++pIt ) {
             Vec3 oP, oN;
-            HPSS( positionsToProject[pIt] , oP , oN , positions , normals , kdtree , 0 , 0.1 , 5 , 20 ); // for example
+            APSS( positionsToProject[pIt] , oP , oN , positions , normals , kdtree , 0  , 0.1 , 10 , 20); // for example
             positionsProjected[pIt] = oP;
             normalsProjected[pIt] = oN;
         }
