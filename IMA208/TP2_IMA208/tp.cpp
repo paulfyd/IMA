@@ -533,6 +533,106 @@ void APSS( Vec3 inputPoint, // the point you need to project
 }
 
 
+//TP2
+
+std::vector< Vec3 > boite_englobante(std::vector< Vec3 > inputPositions, int N){
+
+  float xmax=inputPositions[0][0];
+  float xmin=inputPositions[0][0];
+  float ymax=inputPositions[0][1];
+  float ymin=inputPositions[0][1];
+  float zmax=inputPositions[0][2];
+  float zmin=inputPositions[0][2];
+
+  float x;
+  float y;
+  float z;
+
+  std::vector<Vec3> grid;
+
+  for (int i; i<inputPositions.size(); i++){
+    xmax=std::max(inputPositions[i][0],xmax);
+    xmin=std::min(inputPositions[i][0],xmin);
+    ymax=std::max(inputPositions[i][1],ymax);
+    ymin=std::min(inputPositions[i][1],ymin);
+    zmax=std::max(inputPositions[i][2],zmax);
+    zmax=std::min(inputPositions[i][2],zmin);
+  }
+
+  for (int i; i<N; i++){
+    for (int j; j<N; j++){
+      for (int k; k<N; k++){
+        x = (xmax-xmin)*i/float(N-1) + xmin;
+        y = (ymax-ymin)*j/float(N-1) + xmin;
+        z = (zmax-zmin)*k/float(N-1) + xmin;
+        grid.push_back(Vec3(x,y,z);
+      }
+    }
+
+  }
+
+  return grid;
+}
+
+
+
+
+float f(Vec3 p){
+  HPSS( p , oP , oN , positions , normals , kdtree , 0  , 0.1 , 10 , 20);
+  return Vec3::dot(p-oP,oN);
+}
+
+
+
+std::vector< Vec3 > boite_englobante_f(std::vector< Vec3 > inputPositions, int N){
+
+  float xmax=inputPositions[0][0];
+  float xmin=inputPositions[0][0];
+  float ymax=inputPositions[0][1];
+  float ymin=inputPositions[0][1];
+  float zmax=inputPositions[0][2];
+  float zmin=inputPositions[0][2];
+
+  float x;
+  float y;
+  float z;
+
+  std::vector<Vec3> fgrid;
+
+  for (int i; i<inputPositions.size(); i++){
+    xmax=std::max(inputPositions[i][0],xmax);
+    xmin=std::min(inputPositions[i][0],xmin);
+    ymax=std::max(inputPositions[i][1],ymax);
+    ymin=std::min(inputPositions[i][1],ymin);
+    zmax=std::max(inputPositions[i][2],zmax);
+    zmax=std::min(inputPositions[i][2],zmin);
+  }
+
+  for (int i; i<N; i++){
+    for (int j; j<N; j++){
+      for (int k; k<N; k++){
+        x = (xmax-xmin)*i/float(N-1) + xmin;
+        y = (ymax-ymin)*j/float(N-1) + xmin;
+        z = (zmax-zmin)*k/float(N-1) + xmin;
+        grid.push_back(Vec3(x,y,z);
+      }
+    }
+
+  }
+
+  return fgrid;
+}
+
+
+
+
+
+
+
+
+
+
+
 int main (int argc, char ** argv) {
     if (argc > 2) {
         exit (EXIT_FAILURE);
